@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 로그 및 데이터 파일
+*.log
+logs/
+data/
+reports/
+
+# 설정 파일 (필요한 경우 주석 처리)
+# config.yaml
+
+# 기타
+.DS_Store 
