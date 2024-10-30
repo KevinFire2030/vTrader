@@ -41,7 +41,7 @@
 1. MT5Wrapper (6일차)
    - [x] 기본 구조 작성
    - [ ] 연결 관리 구현
-   - [ ] 에러 처리 구현
+   - [ ] 에러 리 구현
    - [ ] 재연결 로직 구현
    - [ ] 단위 테스트 작성
 
@@ -94,7 +94,7 @@
 - 성능 테스트
 
 ### 2.2 통합 테스트
-- 모듈간 인터페이스 테스트
+- 듈 인터페이스 테스트
 - 데이터 흐름 테스트
 - 에러 전파 테스트
 - 동시성 테스트
@@ -150,7 +150,7 @@
 1. 테스트 결과
    - [x] 초기 데이터 로드 테스트 통과
    - [x] 데이터 업데이트 테스트 통과
-   - [x] 데이터 무결 테스트 통과
+   - [x] 데이터 무결 테스 통과
    - [x] 1분 업데이트 테스트 통과
 
 2. 발견된 문제점
@@ -192,7 +192,7 @@
 
 3. 향후 과제
    - 성능 모니터링 추가
-   - 장애 복구 메커니즘 구현
+   - 장애 구 메커니즘 구현
    - 백업 시스템 구현
 
 ### 2.5 Config 구현 결과
@@ -239,7 +239,7 @@
 2. 주요 기능
    - 로그 레벨
      * DEBUG: 상세 디버깅 정보
-     * INFO: 일반적인 정보
+     * INFO: 일반적인 보
      * WARNING: 경고 메시지
      * ERROR: 에러 메시지
      * CRITICAL: 치명적 오류
@@ -286,7 +286,7 @@
    - 로그 레벨 설정 기능 추가
    - 로그 파일 압축 기능 추가
    - 로그 순환 정책 개선
-   - 에러 로그 분리 저장
+   - 에러 로그 리 저장
 
 ### 2.8 MT5Wrapper 구현 계획
 
@@ -436,7 +436,7 @@
      * symbols_total(): 전체 심볼 수 조회
      * symbols_get(): 심볼 목록 조회
      * symbol_info(): 심볼 정보 조회
-     * symbol_select(): 마켓워치 심볼 ��리
+     * symbol_select(): 마켓워치 심볼 리
    
    - 주문 계산
      * order_calc_margin(): 증거금 계산
@@ -450,7 +450,7 @@
      * history_deals_get(): 거래 내역 조회
 
 2. 구현 우선순위
-   - 1순위: 필수 기능
+   - 1순위: 필수 기
      * 계좌 정보 조회
      * 거래 내역 조회
      * 심볼 정보 조회
@@ -485,3 +485,364 @@
 
 ### 3.2 Backtrader 핵심 클래스
 ...
+
+### 2.11 Position 구현 계획
+
+1. 구현 목표
+   - MT5 포지션 관리 자동화
+   - 포지션 상태 실시간 추적
+   - 손익 계산 및 모니터링
+   - 피라미딩 지원
+
+2. 주요 클래스
+   - Position 클래스
+     * 단일 포지션 정보 관리
+     * 속성:
+       - ticket: MT5 티켓 번호
+       - symbol: 거래 심볼
+       - type: 'BUY' or 'SELL'
+       - volume: 거래량
+       - entry_price: 진입가
+       - exit_price: 청산가
+       - sl_price: 손절가
+       - tp_price: 이익실현가
+       - entry_time: 진입시간
+       - exit_time: 청산시간
+       - lifetime: 포지션 유지 기간
+       - commission: 수수료
+       - swap: 스왑 포인트
+       - profit: 실현 손익
+       - upnl: 미실현 손익
+       - max_profit: 최대 이익
+       - max_loss: 최대 손실
+       - risk_amount: 리스크 금액
+       - entry_atr: 진입시 ATR
+       - comment: 포지션 코멘트
+       - status: 상태 (PENDING/OPEN/CLOSED)
+     * 메서드:
+       - is_long(): 롱 포지션 여부
+       - is_short(): 숏 포지션 여부
+       - is_open(): 포지션 오픈 여부
+       - is_closed(): 포지션 청산 여부
+       - get_holding_time(): 포지션 보유 시간
+       - get_profit(): 포지션 손익
+       - get_risk_amount(): 리스크 금액 계산
+       - get_max_loss(): 최대 손실 계산
+       - get_max_profit(): 최대 이익 계산
+       - update_state(): 상태 업데이트
+       - validate(): 데이터 무결성 검증
+
+   - PositionManager 클래스
+     * 전체 포지션 관리
+     * 속성:
+       - active_positions: Dict[str, List[Position]]
+       - closed_positions: List[Position]
+       - total_units: int
+       - max_units: int
+       - max_units_per_symbol: int
+     * 메서드:
+       - add_position(): 포지션 추가
+       - close_position(): 포지션 청산
+       - get_positions(): 심볼별 포지션 조회
+       - update_sl(): 손절가 수정
+       - sync_positions(): MT5 포지션 동기화
+       - can_add_position(): 포지션 추가 가능 여부
+       - get_total_profit(): 전체 손익 계산
+
+3. 시스템 내 역할
+   - MT5 포지션과 내부 포지션 정보 동기화
+   - 포지션 상태 추적 및 관리
+   - 손익 계산 및 모니터링
+   - 피라미딩 관리 지원
+
+4. 데이터 흐름
+   ```
+   MT5 서버
+     ↓ positions_get()
+   MT5Wrapper
+     ↓ get_positions()
+   PositionManager
+     ↓ sync_positions()
+   Position 객체
+     ↓ update_state()
+   Trader
+   ```
+
+5. 주요 상호작용
+   - Trader 클래스와의 관계
+     * 신규 포지션 생성 요청
+     * 포지션 상태 조회
+     * 청산 신호 처리
+     * 피라미딩 관리
+   
+   - MT5Wrapper와의 관계
+     * 실제 포지션 정보 동기화
+     * 주문 실행 결과 처리
+     * 에러 상황 처리
+   
+   - DataFeed와의 관계
+     * 현재가 정보 수신
+     * 미실현 손익 계산
+     * 기술적 지표 참조
+
+6. 구현 순서
+   - [x] 기본 구조 작성
+   - [ ] Position 클래스 구현
+     * 기본 속성 정의
+     * 손익 계산 메서드
+     * 상태 관리 메서드
+   - [ ] PositionManager 클래스 구현
+     * 포지션 추가/제거
+     * MT5 동기화
+     * 리스크 관리
+   - [ ] 단위 테스트 작성
+
+7. 테스트 계획
+   - Position 클래스 테스트
+     * 속성 초기화 테스트
+     * 손익 계산 테스트
+     * 상태 변경 테스트
+     * 부분 청산 테스트
+   
+   - PositionManager 테스트
+     * 포지션 추가/제거 테스트
+     * MT5 동기화 테스트
+     * 리스크 제한 테스트
+     * 손실 제한 테스트
+
+8. 예상 문제점
+   - MT5 연결 불안정성
+   - 자동 청산 감지 지연
+   - 데이터 동기화 오류
+   - 부분 청산 처리 복잡성
+   - 메모리 관리 이슈
+
+9. 해결 방안
+   - 연결 상태 모니터링
+   - 주기적 동기화 검사
+   - 거래 이력 백업
+   - 상태 검증 강화
+   - 메모리 최적화
+
+### 2.12 MT5 API 참고사항
+
+1. positions_get() 반환값 속성
+   - 기본 정보
+     * ticket: 포지션 티켓 번호
+     * time: 포지션 오픈 시간 (초 단위 timestamp)
+     * time_msc: 포지션 오픈 시간 (밀리초 단위)
+     * time_update: 포지션 수정 시간
+     * time_update_msc: 포지션 수정 시간 (밀리초)
+   
+   - 포지션 상세
+     * type: 포지션 타입 (POSITION_TYPE_BUY/POSITION_TYPE_SELL)
+     * magic: 매직 넘버
+     * identifier: 포지션 식별자
+     * reason: 포지션 생성 이유
+   
+   - 거래 정보
+     * volume: 포지션 크기
+     * price_open: 진입 가격
+     * sl: 손절가 (Stop Loss)
+     * tp: 이익실현가 (Take Profit)
+     * price_current: 현재 가격
+     * swap: 스 금액
+     * profit: 현재 수익
+   
+   - 심볼 정보
+     * symbol: 거래 심볼
+     * comment: 포지션 코멘트
+     * external_id: 외부 시스템 ID
+
+2. 사용 예시
+   ```python
+   positions = mt5.positions_get(symbol="EURUSD")
+   if positions:
+       for position in positions:
+           print(f"티켓: {position.ticket}")
+           print(f"타입: {'매수' if position.type == 0 else '매도'}")
+           print(f"진입가: {position.price_open}")
+           print(f"현재가: {position.price_current}")
+           print(f"손절가: {position.sl}")
+           print(f"수익: {position.profit}")
+   ```
+
+3. 주의사항
+   - positions_get()은 None 또는 tuple 반환
+   - 포지션이 없으면 None 반환
+   - 에러 발생시 None 반환 및 last_error() 확인 필요
+   - 시간값은 UTC 기준
+
+### 2.13 Backtrader Position 클래스 분석
+
+1. Position 클래스 속성
+   - 기본 정보
+     * size: 포지션 크기 (양수: 롱, 음수: 숏)
+     * price: 평균 진입가
+     * adjbase: 조정 기준가
+     * closed: 청산된 크기
+     * trades: 관련 거래 목록
+   
+   - 손익 정보
+     * upopened: 미실현 수량
+     * upclosed: 실현 수량
+     * pnl: 실현 손익
+     * upnl: 미실현 손익
+     * commission: 수수료
+     * margin: 증거금
+   
+   - 시간 정보
+     * opened: 첫 진입 시간
+     * closed: 마지막 청산 시간
+     * lifetime: 포지션 유지 기간
+
+2. 주요 메서드
+   - 포지션 관리
+     * clone(): 포지션 복제
+     * update(size, price): 포지션 업데이트
+     * close(size, price): 포지션 청산
+     * reset(): 포지션 초기화
+   
+   - 손익 계산
+     * get_pnl(): 실현 손익 계산
+     * get_upnl(): 미실현 손익 계산
+     * get_margin(): 필요 증거금 계산
+     * get_leverage(): 레버리지 계산
+   
+   - 상태 확인
+     * is_long(): 롱 포지션 여부
+     * is_short(): 숏 포지션 여부
+     * is_open(): 포지션 오픈 여부
+     * is_closed(): 포지션 청산 여부
+
+3. 구현시 참고사항
+   - 포지션 상태 관리
+     * 진입/청산 시점 기록
+     * 부분 청산 지원
+     * 평균단가 계산
+   
+   - 손익 추적
+     * 실시간 손익 계산
+     * 수수료 반영
+     * 스왑 포인트 처리
+   
+   - 리스크 관리
+     * 최대 손실 추적
+     * 최대 이익 추적
+     * 손절가/이익실현가 관리
+
+4. MT5 연동시 고려사항
+   - 데이터 매핑
+     * MT5 포지션 정보 변환
+     * 시간대 처리
+     * 가격 정밀도 처리
+   
+   - 동기화
+     * 실시간 상태 업데이트
+     * 자동 청산 감지
+     * 부분 청산 처리
+   
+   - 에러 처리
+     * 연결 끊김 대응
+     * 데이터 불일치 처리
+     * 재연결 후 복구
+
+### 2.14 Position 클래스 동작 방식
+
+1. 시스템 내 역할
+   - MT5 포지션과 내부 포지션 정보 동기화
+   - 포지션 상태 추적 및 관리
+   - 손익 계산 및 모니터링
+   - 피라미딩 관리 지원
+
+2. 데이터 흐름
+   ```
+   MT5 서버
+     ↓ positions_get()
+   MT5Wrapper
+     ↓ get_positions()
+   PositionManager
+     ↓ sync_positions()
+   Position 객체
+     ↓ update_state()
+   Trader
+   ```
+
+3. 주요 상호작용
+   - Trader 클래스와의 관계
+     * 신규 포지션 생성 요청
+     * 포지션 상태 조회
+     * 청산 신호 처리
+     * 피라미딩 관리
+   
+   - MT5Wrapper와의 관계
+     * 실제 포지션 정보 동기화
+     * 주문 실행 결과 처리
+     * 에러 상황 처리
+   
+   - DataFeed와의 관계
+     * 현재가 정보 수신
+     * 미실현 손익 계산
+     * 기술적 지표 참조
+
+4. 상태 관리
+   - 포지션 생명주기
+     * 생성: 주문 체결시
+     * 업데이트: 가격 변동시
+     * 수정: 손절가 변경시
+     * 청산: 청산 조건 충족시
+   
+   - 상태 검증
+     * MT5 포지션 존재 여부
+     * 데이터 일관성 검사
+     * 손익 계산 검증
+     * 타임스탬프 확인
+
+5. 이벤트 처리
+   - 자동 청산 감지
+     * MT5 포지션 소실 확인
+     * 거래 이력 조회
+     * 청산 정보 복구
+   
+   - 손절가 도달
+     * 손실 크기 계산
+     * 청산 주문 실행
+     * 기록 저장
+   
+   - 피라미딩 실행
+     * 기존 포지션 확인
+     * 진입 간격 계산
+     * 손절가 재조정
+
+6. 데이터 저장
+   - 실시간 정보
+     * 활성 포지션 목록
+     * 포지션별 상태
+     * 실시간 손익
+   
+   - 이력 관리
+     * 청산된 포지션 기록
+     * 수익률 통계
+     * 거래 로그
+
+7. 에러 처리
+   - 연결 문제
+     * MT5 연결 끊김
+     * 데이터 지연
+     * 재연결 처리
+   
+   - 데이터 불일치
+     * 포지션 정보 불일치
+     * 손익 계산 오류
+     * 상태 복구
+
+8. 성능 고려사항
+   - 메모리 관리
+     * 활성 포지션 캐싱
+     * 이력 데이터 정리
+     * 로그 파일 관리
+   
+   - 처리 지연
+     * 동기화 주기 최적화
+     * 배치 처리 활용
+     * 비동기 로깅
