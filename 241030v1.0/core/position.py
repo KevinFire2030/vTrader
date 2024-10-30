@@ -160,14 +160,21 @@ class Position:
 
 class PositionManager:
     """포지션 관리"""
-    def __init__(self, mt5_wrapper=None, logger=None):
+    def __init__(self, mt5_wrapper=None, logger=None, max_units=15, max_units_per_symbol=4):
+        """
+        Args:
+            mt5_wrapper: MT5Wrapper 인스턴스
+            logger: Logger 인스턴스
+            max_units: 전체 최대 유닛 수 (기본값: 15)
+            max_units_per_symbol: 심볼당 최대 유닛 수 (기본값: 4)
+        """
         self.mt5 = mt5_wrapper
         self.logger = logger
         self.active_positions: Dict[str, List[Position]] = {}
         self.closed_positions: List[Position] = []
         self.total_units = 0
-        self.max_units = 15
-        self.max_units_per_symbol = 4
+        self.max_units = max_units
+        self.max_units_per_symbol = max_units_per_symbol
 
     def _log(self, message: str, level: str = 'info'):
         """로그 출력"""
@@ -199,9 +206,20 @@ class PositionManager:
 
     def add_position(self, position: Position) -> bool:
         """포지션 추가"""
+        # 1. MT5의 실제 포지션 수 확인
+        if self.mt5:
+            mt5_positions = self.mt5.get_positions(position.symbol)
+            current_positions = len(mt5_positions) if mt5_positions else 0
+            
+            if current_positions >= self.max_units_per_symbol:
+                self._log(f"{position.symbol} 최대 유닛 수 초과: {current_positions}/{self.max_units_per_symbol}")
+                return False
+        
+        # 2. Position Manager의 포지션 수 확인
         if not self.can_add_position(position.symbol):
             return False
-            
+        
+        # 3. 포지션 추가
         if position.symbol not in self.active_positions:
             self.active_positions[position.symbol] = []
             

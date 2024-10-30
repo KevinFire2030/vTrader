@@ -25,11 +25,26 @@ class PositionPyramidTest:
         self.magic = 241030
         
         # 모듈 초기화
-        self.mt5 = MT5Wrapper()
         self.logger = Logger("logs", "pyramid_test")
-        self.position_manager = PositionManager(self.mt5, self.logger)
-        
         self.logger.info("Position 피라미딩 테스트 시작")
+        
+        # MT5Wrapper 초기화
+        self.mt5 = MT5Wrapper(self.logger)
+        if not self.mt5.initialize():
+            raise Exception("MT5Wrapper 초기화 실패")
+        
+        # PositionManager 초기화
+        self.position_manager = PositionManager(
+            mt5_wrapper=self.mt5,
+            logger=self.logger,
+            max_units_per_symbol=4
+        )
+        
+        # 심볼 정보 확인
+        if not mt5.symbol_info(self.symbol):
+            raise Exception(f"심볼 정보 없음: {self.symbol}")
+        
+        self.logger.info("초기화 완료")
         
     def cleanup(self):
         """종료 처리"""
@@ -78,56 +93,25 @@ class PositionPyramidTest:
         """피라미딩 진입 테스트"""
         self.logger.info("\n=== 피라미딩 진입 테스트 ===")
         
-        # 기존 포지션 청산
-        mt5_positions = mt5.positions_get(symbol=self.symbol)
-        if mt5_positions:
-            self.logger.info(f"기존 포지션 청산: {len(mt5_positions)}개")
-            for pos in mt5_positions:
-                self._close_position(pos)
-                time.sleep(0.1)
-        
-        # 1. 첫 번째 포지션 생성
-        first_position = self._create_position("첫 번째 진입")
-        if not first_position:
-            return False
-        self.logger.info("첫 번째 포지션 생성 성공")
-        time.sleep(1)
-        
-        # 2. 두 번째 포지션 생성
-        second_position = self._create_position("첫 번째 피라미딩")
-        if not second_position:
-            return False
-        self.logger.info("두 번째 포지션 생성 성공")
-        time.sleep(1)
-        
-        # 3. 세 번째 포지션 생성
-        third_position = self._create_position("두 번째 피라미딩")
-        if not third_position:
-            return False
-        self.logger.info("세 번째 포지션 생성 성공")
-        time.sleep(1)
-        
-        # 4. 네 번째 포지션 생성
-        fourth_position = self._create_position("세 번째 피라미딩")
-        if not fourth_position:
-            return False
-        self.logger.info("네 번째 포지션 생성 성공")
-        time.sleep(1)
-        
-        # 5. 다섯 번째 포지션 생성 시도 (실패해야 함)
-        mt5_positions = mt5.positions_get(symbol=self.symbol)
-        if len(mt5_positions) >= 4:
-            self.logger.info(f"{self.symbol} 최대 유닛 수 초과: {len(mt5_positions)}/4")
-            fifth_position = self._create_position("네 번째 피라미딩")
-            if fifth_position:
-                self.logger.error("다섯 번째 포지션이 생성되었습니다 (실패해야 함)")
+        # 1-5번째 포지션 생성
+        for i in range(5):
+            position = self._create_position(f"{i+1}번째 진입")
+            if not position:
                 return False
-            self.logger.info("다섯 번째 포지션 생성 실패 (예상된 결과)")
+            self.logger.info(f"{i+1}번째 포지션 생성 성공")
+            time.sleep(1)
+        
+        # 6번째 포지션 생성 시도 (실패해야 함)
+        sixth_position = self._create_position("6번째 진입")
+        if sixth_position:
+            self.logger.error("6번째 포지션이 생성되었습니다 (실패해야 함)")
+            return False
+        self.logger.info("6번째 포지션 생성 실패 (예상된 결과)")
         
         # 포지션 수 확인
         mt5_positions = mt5.positions_get(symbol=self.symbol)
-        if len(mt5_positions) != 4:
-            self.logger.error(f"포지션 수 불일치: {len(mt5_positions)} != 4")
+        if len(mt5_positions) != 5:
+            self.logger.error(f"포지션 수 불일치: {len(mt5_positions)} != 5")
             return False
             
         self.logger.info("피라미딩 진입 테스트 성공")
@@ -188,7 +172,7 @@ class PositionPyramidTest:
             self.logger.error("포지션 추가 실패")
             return None
             
-        self.logger.info(f"포지션 생성 성공 (티켓: {position.ticket})")
+        self.logger.info(f"{self.symbol} BUY 포지션 추가 (티켓: {position.ticket})")
         return position
         
     def run_tests(self):
@@ -212,6 +196,9 @@ def main():
         tester.run_tests()
     except Exception as e:
         print(f"테스트 실패: {e}")
+        # 에러 발생시에도 MT5 종료
+        if mt5.initialize():
+            mt5.shutdown()
 
 if __name__ == '__main__':
     main() 
