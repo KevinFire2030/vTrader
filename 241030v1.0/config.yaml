@@ -1,0 +1,30 @@
+# 시스템 설정
+system:
+  name: "vTrader v1.0"
+  mode: "live"  # live, test, backtest
+  log_level: "INFO"
+  log_path: "./logs"
+
+# 거래 설정
+trading:
+  symbols: ["#USNDAQ100"]
+  max_units: 15
+  max_units_per_symbol: 4
+  risk_per_unit: 0.01  # 1%
+
+# 전략 파라미터
+strategy:
+  ema:
+    short: 5
+    mid: 20
+    long: 40
+  atr:
+    period: 20
+    sl_multiple: 2.0
+    pyramid_multiple: 0.5
+
+# MT5 설정
+mt5:
+  magic_number: 241030
+  deviation: 20
+  filling_type: "IOC" 
