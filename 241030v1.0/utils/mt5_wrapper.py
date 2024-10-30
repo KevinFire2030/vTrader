@@ -77,31 +77,74 @@ class MT5Wrapper:
         if not self.check_connection():
             return []
             
+        # 실제 MT5 포지션 조회
         positions = mt5.positions_get(symbol=symbol)
         if positions is None:
             self._log(f"{symbol} 포지션 조회 실패", 'error')
             return []
             
-        return list(positions)
+        # 포지션 정보를 리스트로 변환
+        position_list = []
+        for pos in positions:
+            position_info = {
+                'ticket': pos.ticket,
+                'symbol': pos.symbol,
+                'type': 'BUY' if pos.type == mt5.POSITION_TYPE_BUY else 'SELL',
+                'volume': pos.volume,
+                'price': pos.price_open,
+                'sl': pos.sl,
+                'tp': pos.tp,
+                'time': datetime.utcfromtimestamp(pos.time),
+                'magic': pos.magic,
+                'profit': pos.profit,
+                'comment': pos.comment
+            }
+            position_list.append(position_info)
+            
+        return position_list
         
     def place_order(self, request: Dict) -> Optional[Dict]:
         """주문 실행"""
         if not self.check_connection():
             return None
             
-        retry_count = self.max_retries
-        while retry_count > 0:
-            result = mt5.order_send(request)
-            if result.retcode == mt5.TRADE_RETCODE_DONE:
-                self._log(f"주문 성공: {request['symbol']}")
-                return result
-                
-            self._log(f"주문 실패: {result.comment}, 재시도... ({retry_count})", 'warning')
-            time.sleep(self.retry_delay)
-            retry_count -= 1
+        # 1. 주문 실행 전에 포지션 수 확인
+        symbol = request.get('symbol')
+        mt5_positions = mt5.positions_get(symbol=symbol)
+        current_positions = len(mt5_positions) if mt5_positions else 0
+        
+        if current_positions >= 4:  # 심볼당 최대 4개
+            self._log(f"{symbol} 최대 포지션 수 초과: {current_positions}/4", 'warning')
+            return None
             
-        self._log(f"주문 실패: {request['symbol']}", 'error')
-        return None
+        # 2. 주문 실행
+        result = mt5.order_send(request)
+        if result.retcode != mt5.TRADE_RETCODE_DONE:
+            self._log(f"주문 실패: {result.comment}", 'error')
+            return None
+            
+        # 3. 주문 실행 후 다시 포지션 수 확인
+        mt5_positions = mt5.positions_get(symbol=symbol)
+        current_positions = len(mt5_positions) if mt5_positions else 0
+        
+        if current_positions > 4:  # 최대 수를 초과했다면
+            # 마지막 주문 즉시 청산
+            close_request = {
+                "action": mt5.TRADE_ACTION_DEAL,
+                "symbol": symbol,
+                "volume": request["volume"],
+                "type": mt5.ORDER_TYPE_SELL if request["type"] == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY,
+                "position": result.order,
+                "magic": request.get("magic", 0),
+                "comment": "position limit exceeded",
+                "type_filling": mt5.ORDER_FILLING_IOC,
+            }
+            mt5.order_send(close_request)
+            self._log(f"{symbol} 포지션 수 제한으로 인한 자동 청산", 'warning')
+            return None
+            
+        self._log(f"주문 성공: {request['symbol']}")
+        return result
         
     def modify_order(self, request: Dict) -> bool:
         """주문 수정"""

@@ -66,7 +66,7 @@ class Position:
             self.max_loss = self.profit
 
     def update_state(self, current_price: float):
-        """포지션 상태 업데이트"""
+        """포지션 태 업데이트"""
         # 미실현 손익 계산
         self.update_upnl(current_price)
         
@@ -176,15 +176,25 @@ class PositionManager:
             
     def can_add_position(self, symbol: str) -> bool:
         """포지션 추가 가능 여부 확인"""
-        if self.total_units >= self.max_units:
-            self._log(f"최대 유닛 수 초과: {self.total_units}/{self.max_units}")
-            return False
+        # MT5의 실제 포지션 수 확인
+        if self.mt5:
+            mt5_positions = self.mt5.get_positions(symbol)
+            current_positions = len(mt5_positions) if mt5_positions else 0
             
+            if current_positions >= self.max_units_per_symbol:
+                self._log(f"{symbol} 최대 유닛 수 초과: {current_positions}/{self.max_units_per_symbol}")
+                return False
+        
+        # Position Manager의 포지션 수 확인
         symbol_positions = self.active_positions.get(symbol, [])
         if len(symbol_positions) >= self.max_units_per_symbol:
             self._log(f"{symbol} 최대 유닛 수 초과: {len(symbol_positions)}/{self.max_units_per_symbol}")
             return False
-            
+        
+        if self.total_units >= self.max_units:
+            self._log(f"전체 최대 유닛 수 초과: {self.total_units}/{self.max_units}")
+            return False
+        
         return True
 
     def add_position(self, position: Position) -> bool:
@@ -207,6 +217,14 @@ class PositionManager:
             self._log(f"{symbol} 활성 포지션 없음", 'warning')
             return False
             
+        # 실제 MT5 포지션 확인
+        if self.mt5:
+            mt5_positions = self.mt5.get_positions(symbol)
+            mt5_tickets = set() if mt5_positions is None else {pos.ticket for pos in mt5_positions}
+            if ticket not in mt5_tickets:
+                self._log(f"{symbol} 티켓 {ticket}이 이미 청산됨", 'info')
+        
+        # Position Manager 업데이트
         for i, pos in enumerate(self.active_positions[symbol]):
             if pos.ticket == ticket:
                 pos.close(exit_price, exit_time)
@@ -249,3 +267,19 @@ class PositionManager:
             for pos in positions:
                 total += pos.get_profit()
         return total
+
+    def sync_positions(self):
+        """MT5 실제 포지션과 동기화"""
+        if not self.mt5:
+            return
+            
+        for symbol in list(self.active_positions.keys()):
+            # MT5의 실제 포지션 확인
+            mt5_positions = self.mt5.get_positions(symbol)
+            mt5_tickets = set() if mt5_positions is None else {pos.ticket for pos in mt5_positions}
+            
+            # Position Manager의 포지션 확인
+            for pos in self.active_positions[symbol][:]:  # 복사본으로 순회
+                if pos.ticket not in mt5_tickets:
+                    self._log(f"{symbol} 포지션 자동 청산 감지 (티켓: {pos.ticket})")
+                    self.close_position(symbol, pos.ticket, pos.entry_price, datetime.utcnow())
